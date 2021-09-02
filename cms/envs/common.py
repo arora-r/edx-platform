@@ -164,6 +164,8 @@ PLATFORM_DESCRIPTION = _('Your Platform Description Here')
 PLATFORM_FACEBOOK_ACCOUNT = "http://www.facebook.com/YourPlatformFacebookAccount"
 PLATFORM_TWITTER_ACCOUNT = "@YourPlatformTwitterAccount"
 
+SITE_DISPLAY_URL = "YourPlatformName.domain"
+
 # Dummy secret key for dev/test
 SECRET_KEY = 'dev key'
 FAVICON_PATH = 'images/favicon.ico'

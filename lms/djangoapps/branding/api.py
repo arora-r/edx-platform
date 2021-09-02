@@ -96,6 +96,7 @@ def get_footer(is_secure=True, language=settings.LANGUAGE_CODE):
     }
 
     """
+    site_display_url = configuration_helpers.get_value('site_display_url', settings.SITE_DISPLAY_URL)
     return {
         "copyright": _footer_copyright(),
         "logo_image": _footer_logo_img(is_secure),
@@ -112,7 +113,7 @@ def get_footer(is_secure=True, language=settings.LANGUAGE_CODE):
                    "&utm_source=opensource-partner"
                    "&utm_content=open-edx-partner-footer-link"
                    "&utm_campaign=open-edx-footer",
-            "text": _("Take free online courses at edX.org"),
+            "text": _("Take free online courses at {site_display_url}").format(site_display_url=site_display_url),
         },
     }
 

@@ -65,6 +65,12 @@ CC_MERCHANT_NAME = PLATFORM_NAME
 PLATFORM_FACEBOOK_ACCOUNT = "http://www.facebook.com/YourPlatformFacebookAccount"
 PLATFORM_TWITTER_ACCOUNT = "@YourPlatformTwitterAccount"
 
+# .. setting_name: SITE_DISPLAY_URL
+# .. setting_default: YourPlatformName.domain
+# .. setting_description: A stylized way of representing your site URL to be used
+#     in templates/emails/etc.
+SITE_DISPLAY_URL = "YourPlatformName.domain"
+
 ENABLE_JASMINE = False
 
 LMS_ROOT_URL = 'https://localhost:18000'
