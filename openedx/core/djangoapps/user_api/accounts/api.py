@@ -4,7 +4,9 @@ Programmatic integration point for User API Accounts sub-application
 """
 
 
+from difflib import SequenceMatcher
 import datetime
+import re
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -267,11 +269,63 @@ def _does_name_change_require_verification(user, old_name, new_name):
     """
     If name change requires verification, do not update it through this API.
     """
+
+    user_profile = UserProfile.objects.get(user=user)
+    profile_meta = user_profile.get_meta()
+    name_changes = 0
+    if 'old_names' in profile_meta:
+        name_changes = len(profile_meta['old_names'])
+
     return (
         is_verified_name_enabled()
-        and old_name != new_name
         and len(get_certificates_for_user(user.username)) > 0
+        and (
+            _edits_are_invalid(old_name, new_name)
+            or name_changes >= 2
+        )
     )
+
+
+def _edits_are_invalid(old_name, new_name):
+    """
+    Check if the edits from old name to new name are invalid
+
+    Edits are considered invalid if:
+    * Two or more spaces occur in a row
+    * More than one non-space character is added/removed/replaced (exception for if a space
+      is added on either side of the non-space character)
+    """
+    # if there are multiple spaces in a row, it is invalid
+    contains_multiple_spaces = bool(re.search(r' {2,}', new_name))
+    if contains_multiple_spaces:
+        return True
+
+    modifications = 0
+
+    # get differences between old name and new name
+    sequence = SequenceMatcher(lambda x: x == " ", old_name, new_name)
+    for tag, i1, i2, j1, j2 in sequence.get_opcodes():
+        # if there is more than one sequence in the string that has been modified, edits are invalid
+        if modifications > 1:
+            return True
+
+        # if tag is anything other than equal, increase modifications
+        if tag != 'equal':
+            modifications += 1
+
+            # determine which piece has been modified
+            old_name_substring = old_name[i1:i2]
+            new_name_substring = new_name[j1:j2]
+            modified_substring = (
+                old_name_substring
+                if len(old_name_substring) > len(new_name_substring)
+                else new_name_substring
+            )
+            is_valid = bool(re.search(r'^\s?(\S\s?)?$', modified_substring))
+            if not is_valid:
+                return True
+
+    return False
 
 
 def _get_old_language_proficiencies_if_updating(user_profile, data):

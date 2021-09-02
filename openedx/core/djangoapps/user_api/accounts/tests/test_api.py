@@ -363,41 +363,116 @@ class TestAccountApi(UserSettingsEventTestMixin, EmailTemplateTagMixin, CreateAc
         assert 'Valid e-mail address required.' in field_errors['email']['developer_message']
         assert 'Full Name cannot contain the following characters: < >' in field_errors['name']['user_message']
 
-    @override_waffle_flag(VERIFIED_NAME_FLAG, active=True)
+    @ddt.data(
+        ('Jonathan Adams', 'Jon Adams'),
+        ('Jonathan Adams', 'Jonathan Quincy Adams'),
+        ('Jonathan Adams', 'Jon at han Adams'),
+        ('Jonathan Adams', 'Jonathan  Adams'),
+        ('Jonathan Adams', 'Jonathan Adens')
+    )
+    @ddt.unpack
     @patch(
         'openedx.core.djangoapps.user_api.accounts.api.get_certificates_for_user',
         Mock(return_value=['mock certificate'])
     )
-    def test_name_update_requires_idv(self):
+    def test_name_update_requires_idv_invalid_edits(self, old_name, new_name):
         """
         Test that a name change is blocked through this API if it requires ID verification.
-        In this case, the user has at least one certificate.
+        In this case, the user has invalid name edits
         """
-        update = {'name': 'New Name'}
+        # first update account name to have old name
+        user = UserFactory()
+        default_request = self.request_factory.get("/api/user/v1/accounts/")
+        default_request.user = user
+        update_account_settings(user, {'name': old_name})
 
-        with pytest.raises(AccountValidationError) as context_manager:
-            update_account_settings(self.user, update)
+        with override_waffle_flag(VERIFIED_NAME_FLAG, active=True):
+            with pytest.raises(AccountValidationError) as context_manager:
+                update_account_settings(user, {'name': new_name})
 
         field_errors = context_manager.value.field_errors
         assert len(field_errors) == 1
         assert field_errors['name']['developer_message'] == 'This name change requires ID verification.'
 
-        account_settings = get_account_settings(self.default_request)[0]
-        assert account_settings['name'] != 'New Name'
+        account_settings = get_account_settings(default_request)[0]
+        assert account_settings['name'] != new_name
 
-    @override_waffle_flag(VERIFIED_NAME_FLAG, active=True)
+    @patch(
+        'openedx.core.djangoapps.user_api.accounts.api.get_certificates_for_user',
+        Mock(return_value=['mock certificate'])
+    )
+    def test_name_update_requires_idv_name_changes(self):
+        """
+        Test that a name change is blocked through this API if it requires ID verification.
+        In this case, the user has previously changed their name 2 or more times
+        """
+        # update account name 2 times
+        user = UserFactory()
+        default_request = self.request_factory.get("/api/user/v1/accounts/")
+        default_request.user = user
+        update_account_settings(user, {'name': 'Old Name One'})
+        update_account_settings(user, {'name': 'Old Name Two'})
+
+        new_name = user.profile.name + 's'
+        with override_waffle_flag(VERIFIED_NAME_FLAG, active=True):
+            with pytest.raises(AccountValidationError) as context_manager:
+                update_account_settings(user, {'name': new_name})
+
+        field_errors = context_manager.value.field_errors
+        assert len(field_errors) == 1
+        assert field_errors['name']['developer_message'] == 'This name change requires ID verification.'
+
+        account_settings = get_account_settings(default_request)[0]
+        assert account_settings['name'] != new_name
+
+    @ddt.data(
+        ('Jonathan Adams', 'Jonathan Q Adams'),
+        ('Jonathan Adams', 'Jonathan Adam'),
+        ('Jonathan Adams', 'Jo nathan Adams'),
+        ('Jonathan Adams', 'Jonatha N Adams'),
+        ('Jonathan Adams', 'Jonathan Adáms'),
+        ('Jonathan Adáms', 'Jonathan Adæms'),
+        ('Jonathan Adams', 'Jonathan A\'dams'),
+        ('李陈', '李王')
+    )
+    @ddt.unpack
+    @patch(
+        'openedx.core.djangoapps.user_api.accounts.api.get_certificates_for_user',
+        Mock(return_value=['mock certificate'])
+    )
+    def test_name_update_does_not_require_idv_valid_edits(self, old_name, new_name):
+        """
+        Test that the user can change their name freely if it does not require verification.
+        """
+        user = UserFactory()
+        default_request = self.request_factory.get("/api/user/v1/accounts/")
+        default_request.user = user
+        update_account_settings(user, {'name': old_name})
+
+        with override_waffle_flag(VERIFIED_NAME_FLAG, active=True):
+            update_account_settings(user, {'name': new_name})
+
+        account_settings = get_account_settings(default_request)[0]
+        assert account_settings['name'] == new_name
+
     @patch(
         'openedx.core.djangoapps.user_api.accounts.api.get_certificates_for_user',
         Mock(return_value=[])
     )
-    def test_name_update_does_not_require_idv(self):
+    @override_waffle_flag(VERIFIED_NAME_FLAG, active=True)
+    def test_name_update_does_not_require_idv_no_certificate(self):
         """
-        Test that the user can change their name freely if it does not require verification.
+        Test that the user can change their name freely if they have no certificates
         """
-        update = {'name': 'New Name'}
-        update_account_settings(self.user, update)
-        account_settings = get_account_settings(self.default_request)[0]
-        assert account_settings['name'] == 'New Name'
+        user = UserFactory()
+        default_request = self.request_factory.get("/api/user/v1/accounts/")
+        default_request.user = user
+
+        new_name = user.profile.name + ' Jack'
+        update_account_settings(user, {'name': new_name})
+
+        account_settings = get_account_settings(default_request)[0]
+        assert account_settings['name'] == new_name
 
     @patch('django.core.mail.EmailMultiAlternatives.send')
     @patch('common.djangoapps.student.views.management.render_to_string', Mock(side_effect=mock_render_to_string, autospec=True))  # lint-amnesty, pylint: disable=line-too-long
