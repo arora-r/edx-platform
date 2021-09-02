@@ -173,8 +173,10 @@
                         <td>
                             &copy; {% now "Y" %} {{ platform_name }}, {% trans "All rights reserved" as tmsg %}{{ tmsg | force_escape }}.<br/>
                             <br/>
-                            {% trans "Our mailing address is" as tmsg %}{{ tmsg | force_escape }}:<br/>
-                            {{ contact_mailing_address }}
+			    {% filter force_escape }
+			    {% blocktrans %}Our mailing address is:{page_break} {{ contact_mailing_address }}{% endblocktrans %}
+			    {% interpolate_html msg page_break='<br/>'|safe %}
+			    {% endfilter }
                         </td>
                     </tr>
                     {% if unsubscribe_url %}
