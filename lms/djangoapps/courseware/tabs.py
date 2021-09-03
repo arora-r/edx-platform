@@ -396,7 +396,7 @@ def _get_dynamic_tabs(course, user):
     dynamic_tabs = []
     for tab_type in CourseTabPluginManager.get_tab_types():
         if getattr(tab_type, "is_dynamic", False):
-            tab = tab_type(dict())
+            tab = tab_type({})
             if tab.is_enabled(course, user=user):
                 dynamic_tabs.append(tab)
     dynamic_tabs.sort(key=lambda dynamic_tab: dynamic_tab.name)

@@ -61,11 +61,11 @@ def compare_with_tolerance(student_complex, instructor_complex, tolerance=defaul
         if tolerance == default_tolerance:
             relative_tolerance = True
         if tolerance.endswith('%'):
-            tolerance = evaluator(dict(), {}, tolerance[:-1]) * 0.01
+            tolerance = evaluator({}, {}, tolerance[:-1]) * 0.01
             if not relative_tolerance:
                 tolerance = tolerance * abs(instructor_complex)
         else:
-            tolerance = evaluator(dict(), {}, tolerance)
+            tolerance = evaluator({}, {}, tolerance)
 
     if relative_tolerance:
         tolerance = tolerance * max(abs(student_complex), abs(instructor_complex))

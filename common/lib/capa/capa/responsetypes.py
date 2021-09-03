@@ -1778,7 +1778,7 @@ class NumericalResponse(LoncapaResponse):
         Returns whether this answer is in a valid form.
         """
         try:
-            evaluator(dict(), {}, answer)
+            evaluator({}, {}, answer)
             return True
         except (StudentInputError, UndefinedVariable, UnmatchedParenthesis):
             return False
