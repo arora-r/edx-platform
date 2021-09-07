@@ -14,6 +14,7 @@ from openedx.core.djangoapps.courseware_api.utils import get_celebrations_dict
 from common.djangoapps.student.models import CourseEnrollment
 from lms.djangoapps.course_api.api import course_detail
 from lms.djangoapps.course_home_api.course_metadata.serializers import CourseHomeMetadataSerializer
+from lms.djangoapps.course_goals.models import UserActivity
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.courses import check_course_access
 from lms.djangoapps.courseware.masquerade import setup_masquerade
@@ -72,6 +73,7 @@ class CourseHomeMetadataView(RetrieveAPIView):
         course_key = CourseKey.from_string(course_key_string)
         original_user_is_global_staff = self.request.user.is_staff
         original_user_is_staff = has_access(request.user, 'staff', course_key).has_access
+        original_user = request.user
 
         course = course_detail(request, request.user.username, course_key)
 
@@ -105,6 +107,9 @@ class CourseHomeMetadataView(RetrieveAPIView):
 
         browser_timezone = self.request.query_params.get('browser_timezone', None)
         celebrations = get_celebrations_dict(request.user, enrollment, course, browser_timezone)
+
+        # Populate user activity for tracking progress towards a user's course goals
+        UserActivity.populate_user_activity(original_user, course_key)
 
         data = {
             'course_id': course.id,

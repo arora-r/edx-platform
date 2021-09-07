@@ -22,6 +22,7 @@ from lms.djangoapps.course_goals.api import (
     get_goal_api_url,
     has_course_goal_permission
 )
+from lms.djangoapps.course_goals.models import UserActivity
 from lms.djangoapps.courseware.exceptions import CourseAccessRedirect, Redirect
 from lms.djangoapps.courseware.utils import can_show_verified_upgrade, verified_upgrade_deadline_link
 from lms.djangoapps.courseware.views.views import CourseTabView
@@ -175,6 +176,9 @@ class CourseHomeFragmentView(EdxFragmentView):
             # this is a course that does not support direct enrollment.
             if not can_self_enroll_in_course(course_key):
                 raise CourseAccessRedirect(reverse('dashboard'))
+
+        # Populate user activity for tracking progress towards a user's course goals
+        UserActivity.populate_user_activity(request.user, course_key)
 
         # Get the course tools enabled for this user and course
         course_tools = CourseToolsPluginManager.get_enabled_course_tools(request, course_key)

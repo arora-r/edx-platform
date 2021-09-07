@@ -32,6 +32,7 @@ from common.djangoapps.util.json_request import JsonResponse, expect_json
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.courses import get_course_with_access
 from lms.djangoapps.courseware.views.views import CourseTabView
+from lms.djangoapps.course_goals.models import UserActivity
 from lms.djangoapps.discussion.config.settings import is_forum_daily_digest_enabled
 from lms.djangoapps.discussion.django_comment_client.base.views import track_thread_viewed_event
 from lms.djangoapps.discussion.django_comment_client.constants import TYPE_ENTRY
@@ -751,6 +752,10 @@ class DiscussionBoardFragmentView(EdxFragmentView):
             fragment.add_javascript(inline_js)
             if not settings.REQUIRE_DEBUG:
                 fragment.add_javascript_url(staticfiles_storage.url('discussion/js/discussion_board_factory.js'))
+
+            # Populate user activity for tracking progress towards a user's course goals
+            UserActivity.populate_user_activity(request.user, course_key)
+
             return fragment
         except cc.utils.CommentClientMaintenanceError:
             log.warning('Forum is in maintenance mode')

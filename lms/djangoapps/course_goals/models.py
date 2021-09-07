@@ -3,13 +3,18 @@ Course Goals Models
 """
 
 import uuid
+import pytz
+from datetime import datetime, timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from model_utils import Choices
 from opaque_keys.edx.django.models import CourseKeyField
 from simple_history.models import HistoricalRecords
+
+from openedx.core.djangoapps.user_api.preferences.api import get_user_preferences
 
 # Each goal is represented by a goal key and a string description.
 GOAL_KEY_CHOICES = Choices(
@@ -84,3 +89,38 @@ class UserActivity(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     course_key = CourseKeyField(max_length=255)
     date = models.DateField()
+
+    @classmethod
+    def populate_user_activity(cls, user, course_key):
+        '''
+        Update the user activity table with a record for this activity.
+
+        Since we store one activity per date, we don't need to query the database
+        for every activity on a given date.
+        To avoid unnecessary queries, we store a record in a cache once we have an activity for the date,
+        which times out at the end of that date (in the user's timezone).
+        '''
+        if not user.id:
+            return
+
+        user_preferences = get_user_preferences(user)
+        timezone = pytz.timezone(user_preferences.get('time_zone', 'UTC'))
+        now = datetime.now(timezone)
+        date = now.date()
+
+        cache_key = 'goals_user_activity_{}_{}_{}'.format(str(user.id), str(course_key), str(date))
+
+        if cache.get(cache_key):
+            return
+
+        activity_object, __ = cls.objects.get_or_create(user=user, course_key=course_key, date=date)
+
+        # Cache result until the end of the day to avoid unnecessary database requests
+        tomorrow = now + timedelta(days=1)
+        midnight = datetime(year=tomorrow.year, month=tomorrow.month,
+                            day=tomorrow.day, hour=0, minute=0, second=0, tzinfo=timezone)
+        seconds_until_midnight = (midnight - now).seconds
+
+        # The value of the cached object is not currently used,
+        # but the presence of a cached object means we don't make unnecessary queries.
+        cache.set(cache_key, str(activity_object), seconds_until_midnight)

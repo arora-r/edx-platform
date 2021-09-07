@@ -5,14 +5,18 @@ Course Goals Views - includes REST API
 
 from django.contrib.auth import get_user_model
 from django.http import JsonResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
+from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from lms.djangoapps.course_goals.api import get_course_goal_options
-from lms.djangoapps.course_goals.models import GOAL_KEY_CHOICES, CourseGoal
+from lms.djangoapps.course_goals.models import GOAL_KEY_CHOICES, CourseGoal, UserActivity
 from openedx.core.lib.api.permissions import IsStaffOrOwner
 
 User = get_user_model()
@@ -102,3 +106,40 @@ class CourseGoalViewSet(viewsets.ModelViewSet):
             'is_unsure': goal_key == GOAL_KEY_CHOICES.unsure,
         }
         return JsonResponse(data, content_type="application/json", status=(200 if goal else 201))  # lint-amnesty, pylint: disable=redundant-content-type-for-json-response
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class PopulateUserActivity(APIView):
+    """
+    API that allows external callers to populate the user activity table
+    """
+    authentication_classes = (JwtAuthentication, SessionAuthentication,)
+    permission_classes = (permissions.IsAuthenticated, IsStaffOrOwner,)
+
+    def post(self, request):
+        """
+        Handle the POST request
+
+        Retrieve the variables from the request
+        that are necessary to populate the user activity table.
+        """
+        try:
+            user_id = int(request.data.get('user_id'))
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                'Provided user id does not correspond to an existing user',
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        course_key = request.data.get('course_key')
+        try:
+            course_key = CourseKey.from_string(course_key)
+        except InvalidKeyError:
+            return Response(
+                'Provided course key is not valid',
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Populate user activity for tracking progress towards a user's course goals
+        UserActivity.populate_user_activity(user, course_key)
