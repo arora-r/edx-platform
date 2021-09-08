@@ -163,6 +163,8 @@ a:not(.btn), a:visited:not(.btn) {
     color: #00688d !important;
     font-weight: 700;
     font-size: 14px !important;
+    display: none;
+    text-decoration: underline;
 }
 
 .collapsible-item {
@@ -242,6 +244,10 @@ a:not(.btn), a:visited:not(.btn) {
 
     .price-display {
         font-size: 14px;
+    }
+
+    .verified-note {
+        padding: 1rem 0.7rem;
     }
 }
 
