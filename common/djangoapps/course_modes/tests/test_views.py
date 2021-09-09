@@ -4,6 +4,7 @@ Tests for course_modes views.
 
 
 import decimal
+import mock
 import unittest
 from datetime import datetime, timedelta
 from unittest.mock import patch
@@ -21,16 +22,20 @@ from common.djangoapps.student.models import CourseEnrollment
 from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
 from common.djangoapps.util.testing import UrlResetMixin
 from common.djangoapps.util.tests.mixins.discovery import CourseCatalogServiceMockMixin
+from edx_toggles.toggles.testutils import override_waffle_flag
 from lms.djangoapps.commerce.tests import test_utils as ecomm_test_utils
 from lms.djangoapps.commerce.tests.mocks import mock_payment_processors
 from lms.djangoapps.verify_student.services import IDVerificationService
 from openedx.core.djangoapps.catalog.tests.mixins import CatalogIntegrationMixin
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.embargo.test_utils import restrict_course
 from openedx.core.djangoapps.theming.tests.test_util import with_comprehensive_theme
+from openedx.features.course_duration_limits.models import CourseDurationLimitConfig
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 from xmodule.modulestore.tests.factories import CourseFactory
 
+from ..views import VALUE_PROP_TRACK_SELECTION_FLAG
 
 @ddt.ddt
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
@@ -506,6 +511,50 @@ class CourseModeViewTest(CatalogIntegrationMixin, UrlResetMixin, ModuleStoreTest
             # URL-encoded version of 1/1/15, 12:00 AM
             redirect_url = reverse('dashboard') + '?course_closed=1%2F1%2F15%2C+12%3A00+AM'
             self.assertRedirects(response, redirect_url)
+
+    # Value Prop TODO: remove waffle flag from tests once the new Track Selection template is rolled out.
+    # Other tests may need to be updated/removed to reflect the new page.
+    # The below test can be separated into multiple tests once un-happy path is implemented.
+    def test_new_track_selection(self):
+        # For the new track selection template to render, FBE must be fully on (gated_content and audit_access_deadline)
+        # and happy path conditions must be met:
+        # User can upgrade, FBE is fully on, and user is not an enterprise user.
+        deadline = datetime.now(pytz.utc) + timedelta(days=2)
+        course_fbe_on = CourseFactory.create(gated_content=True, audit_access_deadline=deadline)
+
+        # Create the course modes and enroll the user
+        verified_mode = CourseModeFactory.create(
+            mode_slug='verified', course_id=course_fbe_on.id,
+            min_price=149,
+        )
+        CourseEnrollmentFactory(
+            is_active=True,
+            course_id=course_fbe_on.id,
+            user=self.user
+        )
+
+        # Check whether new track selection template is rendered.
+        # This should *only* be shown when the waffle flag is on.
+        with override_waffle_flag(VALUE_PROP_TRACK_SELECTION_FLAG, active=True):
+            with mock.patch('openedx.features.content_type_gating.models.ContentTypeGatingConfig.enabled_for_enrollment', return_value=True):
+                url = reverse('course_modes_choose', args=[str(course_fbe_on.id)])
+                response = self.client.get(url)
+
+                self.assertContains(response, "Choose a path for your course in")
+
+                # Check if it displays the upgrade price for verified track and "Free" for audit track
+                self.assertContains(response, verified_mode.min_price)
+                self.assertContains(response, "Free")
+                # Check for specific HTML elements
+                self.assertContains(response, '<span class="award-icon">')
+                self.assertContains(response, '<span class="popover-icon">')
+                self.assertContains(response, '<span class="note-icon">')
+  
+                # Check for happy path messaging - verified
+                self.assertContains(response, '<li class="collapsible-item">')
+                # Check for happy path messaging - audit
+                self.assertContains(response, "Get temporary access")
+                self.assertContains(response, "Access expires and all progress will be lost")
 
 
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
