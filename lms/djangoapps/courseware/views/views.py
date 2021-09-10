@@ -58,7 +58,6 @@ from lms.djangoapps.course_home_api.toggles import (
     course_home_legacy_is_active,
     course_home_mfe_progress_tab_is_active
 )
-from lms.djangoapps.course_goals.models import UserActivity
 from openedx.features.course_experience.url_helpers import get_learning_mfe_home_url, is_request_from_learning_mfe
 from lms.djangoapps.courseware.access import has_access, has_ccx_coach_role
 from lms.djangoapps.courseware.access_utils import check_course_open_for_learner, check_public_access
@@ -603,9 +602,6 @@ class StaticCourseTabView(EdxFragmentView):
         if tab is None:
             raise Http404
 
-        # Populate user activity for tracking progress toward's a user's course goals
-        UserActivity.populate_user_activity(request.user, course_key)
-
         # Show warnings if the user has limited access
         CourseTabView.register_user_access_warning_messages(request, course)
 
@@ -648,10 +644,6 @@ class CourseTabView(EdxFragmentView):
                 # Render the page
                 course_tabs = course.tabs + _get_dynamic_tabs(course, request.user)
                 tab = CourseTabList.get_tab_by_type(course_tabs, tab_type)
-
-                # Populate user activity for tracking progress towards a user's course goals
-                UserActivity.populate_user_activity(request.user, course_key)
-
                 page_context = self.create_page_context(request, course=course, tab=tab, **kwargs)
 
                 # Show warnings if the user has limited access

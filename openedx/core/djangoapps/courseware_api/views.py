@@ -23,7 +23,6 @@ from lms.djangoapps.edxnotes.helpers import is_feature_enabled
 from lms.djangoapps.certificates.api import get_certificate_url
 from lms.djangoapps.certificates.models import GeneratedCertificate
 from lms.djangoapps.course_api.api import course_detail
-from lms.djangoapps.course_goals.models import UserActivity
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.access_response import (
     CoursewareMicrofrontendDisabledAccessError,
@@ -106,9 +105,6 @@ class CoursewareMeta:
             course_key=course_key,
             is_global_staff=self.original_user_is_global_staff,
         )
-
-        # Populate user activity for tracking progress towards a user's course goals
-        UserActivity.populate_user_activity(request.user, course_key)
 
     def __getattr__(self, name):
         return getattr(self.overview, name)

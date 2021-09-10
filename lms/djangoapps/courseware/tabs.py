@@ -10,6 +10,7 @@ from django.utils.translation import ugettext_noop
 
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.entrance_exams import user_can_skip_entrance_exam
+from lms.djangoapps.course_goals.models import UserActivity
 from lms.djangoapps.course_home_api.toggles import course_home_legacy_is_active, course_home_mfe_progress_tab_is_active
 from openedx.core.lib.course_tabs import CourseTabPluginManager
 from openedx.features.course_experience import DISABLE_UNIFIED_COURSE_TAB_FLAG, default_course_url_name
@@ -383,6 +384,11 @@ def get_course_tab_list(user, course):
     # further investigation since CourseTabList.iterate_displayable returns
     # Static Tabs that are not returned by the CourseTabPluginManager.
     course_tab_list.sort(key=lambda tab: tab.priority or float('inf'))
+
+    if course_tab_list:
+        # Populate user activity for tracking progress towards a user's course goals
+        UserActivity.populate_user_activity(user, course.id)
+
     return course_tab_list
 
 

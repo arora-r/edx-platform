@@ -28,7 +28,6 @@ from web_fragments.fragment import Fragment
 
 from common.djangoapps.edxmako.shortcuts import render_to_response, render_to_string
 from lms.djangoapps.courseware.exceptions import CourseAccessRedirect, Redirect
-from lms.djangoapps.course_goals.models import UserActivity
 from lms.djangoapps.experiments.utils import get_experiment_user_metadata_context
 from lms.djangoapps.gating.api import get_entrance_exam_score_ratio, get_entrance_exam_usage_key
 from lms.djangoapps.grades.api import CourseGradeFactory
@@ -149,9 +148,6 @@ class CoursewareIndex(View):
                         not CourseEnrollment.is_enrolled(request.user, self.course_key)
                 ):
                     self.view = PUBLIC_VIEW
-
-                # Populate user activity for tracking progress towards a user's course goals
-                UserActivity.populate_user_activity(request.user, self.course_key)
 
                 self.can_masquerade = request.user.has_perm(MASQUERADE_AS_STUDENT, self.course)
                 self._setup_masquerade_for_effective_user()
